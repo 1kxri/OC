@@ -1,0 +1,163 @@
+https://github.com/1kxri/OC/tree/mainAdd-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+# Form setup (approx A4 size in pixels - about 800x1100)
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "Настройка мониторинга активности жесткого диска в ОС Windows"
+$form.Width = 820
+$form.Height = 1120
+$form.StartPosition = "CenterScreen"
+$form.FormBorderStyle = "FixedDialog"
+$form.MaximizeBox = $false
+
+# Fonts
+$fontTitle = New-Object System.Drawing.Font("Segoe UI",16,[System.Drawing.FontStyle]::Bold)
+$fontNormal = New-Object System.Drawing.Font("Segoe UI",10,[System.Drawing.FontStyle]::Regular)
+$fontMono = New-Object System.Drawing.Font("Consolas",10,[System.Drawing.FontStyle]::Regular)
+
+# Title label
+$labelTitle = New-Object System.Windows.Forms.Label
+$labelTitle.Text = "Настройка мониторинга активности жесткого диска в ОС Windows"
+$labelTitle.Font = $fontTitle
+$labelTitle.AutoSize = $false
+$labelTitle.Width = 780
+$labelTitle.Height = 50
+$labelTitle.Location = New-Object System.Drawing.Point(15,15)
+$labelTitle.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$form.Controls.Add($labelTitle)
+
+# Informational multi-line TextBox (readonly)
+$textInfo = New-Object System.Windows.Forms.TextBox
+$textInfo.Multiline = $true
+$textInfo.Width = 780
+$textInfo.Height = 250
+$textInfo.Location = New-Object System.Drawing.Point(15, 75)
+$textInfo.Font = $fontNormal
+$textInfo.ReadOnly = $true
+$textInfo.ScrollBars = "Vertical"
+$textInfo.BackColor = [System.Drawing.SystemColors]::Window
+$textInfo.Text = @"
+Данное приложение демонстрирует настройку и мониторинг активности жесткого диска в операционной системе Windows.
+Вы сможете наблюдать текущую нагрузку на диск, время его активности и скорость чтения/записи данных в реальном времени.
+
+Для мониторинга используется счётчик производительности:
+- % Disk Time (процент времени активности диска)
+- Disk Read Bytes/sec (скорость чтения)
+- Disk Write Bytes/sec (скорость записи)
+
+Нажмите кнопку 'Начать мониторинг', чтобы запустить сбор данных, и 'Остановить мониторинг' чтобы прекратить.
+"@
+$form.Controls.Add($textInfo)
+
+# Button Start
+$buttonStart = New-Object System.Windows.Forms.Button
+$buttonStart.Text = "Начать мониторинг"
+$buttonStart.Width = 200
+$buttonStart.Height = 40
+$buttonStart.Location = New-Object System.Drawing.Point(150, 340)
+$form.Controls.Add($buttonStart)
+
+# Button Stop
+$buttonStop = New-Object System.Windows.Forms.Button
+$buttonStop.Text = "Остановить мониторинг"
+$buttonStop.Width = 200
+$buttonStop.Height = 40
+$buttonStop.Location = New-Object System.Drawing.Point(450, 340)
+$buttonStop.Enabled = $false
+$form.Controls.Add($buttonStop)
+
+# Label for real-time output
+$labelOutputTitle = New-Object System.Windows.Forms.Label
+$labelOutputTitle.Text = "Текущие параметры активности диска:"
+$labelOutputTitle.Font = $fontNormal
+$labelOutputTitle.Width = 780
+$labelOutputTitle.Height = 25
+$labelOutputTitle.Location = New-Object System.Drawing.Point(15, 400)
+$form.Controls.Add($labelOutputTitle)
+
+# Textbox output (multiline, readonly) with scrollbars
+$textOutput = New-Object System.Windows.Forms.TextBox
+$textOutput.Multiline = $true
+$textOutput.Width = 780
+$textOutput.Height = 600
+$textOutput.Location = New-Object System.Drawing.Point(15, 430)
+$textOutput.Font = $fontMono
+$textOutput.BackColor = [System.Drawing.SystemColors]::Window
+$textOutput.ReadOnly = $true
+$textOutput.ScrollBars = "Vertical"
+$form.Controls.Add($textOutput)
+
+# Define performance counters for PhysicalDisk (_Total)
+$counterDiskTime = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","% Disk Time","_Total")
+$counterDiskRead = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","Disk Read Bytes/sec","_Total")
+$counterDiskWrite = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","Disk Write Bytes/sec","_Total")
+
+# Timer for update every second
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 1000
+
+# Button event handlers
+$buttonStart.Add_Click({
+    try {
+        # Initialize counter reads to avoid invalid value the first time
+        $null = $counterDiskTime.NextValue()
+        $null = $counterDiskRead.NextValue()
+        $null = $counterDiskWrite.NextValue()
+        Start-Sleep -Milliseconds 500
+
+        $timer.Start()
+        $buttonStart.Enabled = $false
+        $buttonStop.Enabled = $true
+        $textOutput.Clear()
+        $textOutput.AppendText("Мониторинг запущен..." + [Environment]::NewLine)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show("Ошибка инициализации счетчиков: $($_.Exception.Message)","Ошибка", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+})
+
+$buttonStop.Add_Click({
+    $timer.Stop()
+    $buttonStart.Enabled = $true
+    $buttonStop.Enabled = $false
+    $textOutput.AppendText("Мониторинг остановлен." + [Environment]::NewLine)
+})
+
+# Timer tick event - update data
+$timer.Add_Tick({
+    try {
+        $diskTime = [math]::Round($counterDiskTime.NextValue(), 2)
+        $diskReadBytes = [math]::Round($counterDiskRead.NextValue())
+        $diskWriteBytes = [math]::Round($counterDiskWrite.NextValue())
+
+        # Convert bytes to KB/s or MB/s for readability
+        function Format-Bytes([long]$bytes) {
+            if ($bytes -gt 1MB) {
+                return "{0:N2} MB/s" -f ($bytes / 1MB)
+            }
+            elseif ($bytes -gt 1KB) {
+                return "{0:N2} KB/s" -f ($bytes / 1KB)
+            }
+            else {
+                return "$bytes B/s"
+            }
+        }
+
+        $outputText = "Время активности диска (PhysicalDisk _Total) : $diskTime %`r`n"
+        $outputText += "Скорость чтения: " + (Format-Bytes $diskReadBytes) + "`r`n"
+        $outputText += "Скорость записи: " + (Format-Bytes $diskWriteBytes) + "`r`n"
+        $outputText += "----------------------------------------`r`n"
+
+        $textOutput.AppendText($outputText)
+
+        # Scroll to bottom
+        $textOutput.SelectionStart = $textOutput.Text.Length
+        $textOutput.ScrollToCaret()
+    }
+    catch {
+        $textOutput.AppendText("Ошибка получения данных: $($_.Exception.Message)`r`n")
+    }
+})
+
+# Show the form
+[void]$form.ShowDialog()
