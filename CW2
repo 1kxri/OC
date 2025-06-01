@@ -1,0 +1,154 @@
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+# Создание компактной формы
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "Мониторинг диска"
+$form.Width = 700
+$form.Height = 700
+$form.StartPosition = "CenterScreen"
+$form.FormBorderStyle = "FixedDialog"
+$form.MaximizeBox = $false
+$form.BackColor = [System.Drawing.Color]::WhiteSmoke
+
+# Шрифты
+$fontTitle = New-Object System.Drawing.Font("Segoe UI",12,[System.Drawing.FontStyle]::Bold)
+$fontMono = New-Object System.Drawing.Font("Consolas",9)
+
+# Заголовок
+$labelTitle = New-Object System.Windows.Forms.Label
+$labelTitle.Text = "Мониторинг активности диска"
+$labelTitle.Font = $fontTitle
+$labelTitle.Width = 660
+$labelTitle.Height = 30
+$labelTitle.Location = New-Object System.Drawing.Point(20, 10)
+$labelTitle.TextAlign = 'MiddleCenter'
+$form.Controls.Add($labelTitle)
+
+# Кнопки
+$buttonStart = New-Object System.Windows.Forms.Button
+$buttonStart.Text = "Старт"
+$buttonStart.Size = '140,30'
+$buttonStart.Location = '20,50'
+$form.Controls.Add($buttonStart)
+
+$buttonStop = New-Object System.Windows.Forms.Button
+$buttonStop.Text = "Стоп"
+$buttonStop.Size = '140,30'
+$buttonStop.Location = '180,50'
+$buttonStop.Enabled = $false
+$form.Controls.Add($buttonStop)
+
+$buttonSave = New-Object System.Windows.Forms.Button
+$buttonSave.Text = "Сохранить"
+$buttonSave.Size = '140,30'
+$buttonSave.Location = '340,50'
+$buttonSave.Enabled = $false
+$form.Controls.Add($buttonSave)
+
+$buttonUsage = New-Object System.Windows.Forms.Button
+$buttonUsage.Text = "Исп. дисков"
+$buttonUsage.Size = '140,30'
+$buttonUsage.Location = '500,50'
+$form.Controls.Add($buttonUsage)
+
+# Вывод
+$textOutput = New-Object System.Windows.Forms.TextBox
+$textOutput.Multiline = $true
+$textOutput.Width = 660
+$textOutput.Height = 550
+$textOutput.Location = '20,90'
+$textOutput.Font = $fontMono
+$textOutput.ReadOnly = $true
+$textOutput.ScrollBars = "Vertical"
+$form.Controls.Add($textOutput)
+
+# Счетчики
+$counterDiskTime = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","% Disk Time","_Total")
+$counterRead = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","Disk Read Bytes/sec","_Total")
+$counterWrite = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","Disk Write Bytes/sec","_Total")
+$counterQueue = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","Current Disk Queue Length","_Total")
+$counterAvgTime = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk","Avg. Disk sec/Transfer","_Total")
+
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 1000
+
+function Format-Bytes([long]$bytes) {
+    if ($bytes -gt 1MB) { return "{0:N2} MB/s" -f ($bytes / 1MB) }
+    elseif ($bytes -gt 1KB) { return "{0:N2} KB/s" -f ($bytes / 1KB) }
+    else { return "$bytes B/s" }
+}
+
+# Таймер
+$timer.Add_Tick({
+    try {
+        $diskTime = [math]::Round($counterDiskTime.NextValue(),2)
+        $read = [math]::Round($counterRead.NextValue())
+        $write = [math]::Round($counterWrite.NextValue())
+        $queue = [math]::Round($counterQueue.NextValue(), 2)
+        $avgTime = [math]::Round($counterAvgTime.NextValue(), 4)
+
+        $bar = "=" * ($diskTime / 2) + " " * (50 - ($diskTime / 2))
+        $text = @"
+% Активности: $diskTime %
+Чтение:       $(Format-Bytes $read)
+Запись:       $(Format-Bytes $write)
+Очередь:      $queue
+Отклик:       $avgTime сек
+[${bar}]
+-------------------------------
+"@
+        $textOutput.AppendText($text)
+        $textOutput.SelectionStart = $textOutput.Text.Length
+        $textOutput.ScrollToCaret()
+    } catch {
+        $textOutput.AppendText("Ошибка: $_`r`n")
+    }
+})
+
+# Кнопки
+$buttonStart.Add_Click({
+    $null = $counterDiskTime.NextValue()
+    $null = $counterRead.NextValue()
+    $null = $counterWrite.NextValue()
+    $null = $counterQueue.NextValue()
+    $null = $counterAvgTime.NextValue()
+    Start-Sleep -Milliseconds 500
+
+    $textOutput.AppendText("Мониторинг запущен...`r`n")
+    $timer.Start()
+    $buttonStart.Enabled = $false
+    $buttonStop.Enabled = $true
+    $buttonSave.Enabled = $true
+})
+
+$buttonStop.Add_Click({
+    $timer.Stop()
+    $textOutput.AppendText("Мониторинг остановлен.`r`n")
+    $buttonStart.Enabled = $true
+    $buttonStop.Enabled = $false
+})
+
+$buttonSave.Add_Click({
+    $dlg = New-Object System.Windows.Forms.SaveFileDialog
+    $dlg.Filter = "Text File (*.txt)|*.txt"
+    if ($dlg.ShowDialog() -eq "OK") {
+        [System.IO.File]::WriteAllText($dlg.FileName, $textOutput.Text)
+        [System.Windows.Forms.MessageBox]::Show("Сохранено: $($dlg.FileName)")
+    }
+})
+
+$buttonUsage.Add_Click({
+    $textOutput.AppendText("Использование дисков:`r`n")
+    Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object {
+        $free = "{0:N2}" -f ($_.FreeSpace / 1GB)
+        $size = "{0:N2}" -f ($_.Size / 1GB)
+        $used = "{0:N2}" -f (($_.Size - $_.FreeSpace) / 1GB)
+        $percent = [math]::Round((($_.Size - $_.FreeSpace) / $_.Size) * 100, 1)
+        $textOutput.AppendText("Диск $_.DeviceID : $used ГБ / $size ГБ ($percent %)`r`n")
+    }
+    $textOutput.AppendText("-------------------------------`r`n")
+})
+
+# Запуск формы
+[void]$form.ShowDialog()
