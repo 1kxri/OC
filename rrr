@@ -1,14 +1,34 @@
+import java.util.Scanner;
+
 public class Figure9 {
     public static void main(String[] args) {
-        int s = 5; // размер из примера (s = 5)
+        Scanner scanner = new Scanner(System.in);
+        
+        System.out.print("Введите размер фигуры s (нечетное число >= 1): ");
+        int s = scanner.nextInt();
+        
         printFigure(s);
+        
+        scanner.close();
     }
     
     public static void printFigure(int s) {
-        if (s % 2 == 0 || s < 1) {
-            System.out.println("s должно быть нечетным и >= 1");
+        if (s < 1) {
+            System.out.println("Ошибка: s должно быть >= 1");
             return;
         }
+        
+        if (s % 2 == 0) {
+            System.out.println("Ошибка: s должно быть нечетным числом");
+            System.out.println("Используется ближайшее нечетное число: " + (s - 1));
+            s = s - 1;
+            if (s < 1) {
+                s = 1;
+            }
+        }
+        
+        System.out.println("Фигура размером " + s + ":");
+        System.out.println();
         
         int middle = s / 2;
         
@@ -43,3 +63,4 @@ public class Figure9 {
         }
     }
 }
+    
