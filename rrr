@@ -3,64 +3,58 @@ import java.util.Scanner;
 public class Figure9 {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        
+
         System.out.print("Введите размер фигуры s (нечетное число >= 1): ");
         int s = scanner.nextInt();
-        
+
         printFigure(s);
-        
+
         scanner.close();
     }
-    
+
     public static void printFigure(int s) {
         if (s < 1) {
             System.out.println("Ошибка: s должно быть >= 1");
             return;
         }
-        
+
         if (s % 2 == 0) {
             System.out.println("Ошибка: s должно быть нечетным числом");
-            System.out.println("Используется ближайшее нечетное число: " + (s - 1));
-            s = s - 1;
-            if (s < 1) {
-                s = 1;
-            }
+            return;
         }
-        
+
         System.out.println("Фигура размером " + s + ":");
         System.out.println();
-        
+
         int middle = s / 2;
-        
-        // Верхняя половина ромба (включая середину)
+
+        // Верхняя половина ромба
         for (int i = 0; i <= middle; i++) {
             // Пробелы слева
             for (int j = 0; j < middle - i; j++) {
                 System.out.print(" ");
             }
-            
+
             // Звездочки
             for (int j = 0; j < 2 * i + 1; j++) {
                 System.out.print("*");
             }
-            
+
             System.out.println();
         }
-        
-        // Нижняя половина ромба (без середины)
+
+        // Нижняя половина ромба 
         for (int i = middle - 1; i >= 0; i--) {
             // Пробелы слева
             for (int j = 0; j < middle - i; j++) {
                 System.out.print(" ");
             }
             
-            // Звездочки
             for (int j = 0; j < 2 * i + 1; j++) {
                 System.out.print("*");
             }
-            
+
             System.out.println();
         }
     }
 }
-    
