@@ -1,0 +1,45 @@
+public class Figure9 {
+    public static void main(String[] args) {
+        int s = 5; // размер из примера (s = 5)
+        printFigure(s);
+    }
+    
+    public static void printFigure(int s) {
+        if (s % 2 == 0 || s < 1) {
+            System.out.println("s должно быть нечетным и >= 1");
+            return;
+        }
+        
+        int middle = s / 2;
+        
+        // Верхняя половина ромба (включая середину)
+        for (int i = 0; i <= middle; i++) {
+            // Пробелы слева
+            for (int j = 0; j < middle - i; j++) {
+                System.out.print(" ");
+            }
+            
+            // Звездочки
+            for (int j = 0; j < 2 * i + 1; j++) {
+                System.out.print("*");
+            }
+            
+            System.out.println();
+        }
+        
+        // Нижняя половина ромба (без середины)
+        for (int i = middle - 1; i >= 0; i--) {
+            // Пробелы слева
+            for (int j = 0; j < middle - i; j++) {
+                System.out.print(" ");
+            }
+            
+            // Звездочки
+            for (int j = 0; j < 2 * i + 1; j++) {
+                System.out.print("*");
+            }
+            
+            System.out.println();
+        }
+    }
+}
